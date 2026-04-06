@@ -15,6 +15,7 @@ use crate::frameworks::core_graphics::cg_bitmap_context::{
 };
 use crate::frameworks::core_graphics::cg_color::CGColorRef;
 use crate::frameworks::core_graphics::cg_geometry::CGPointZero;
+use crate::frameworks::core_graphics::cg_path::CGPathRef;
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
@@ -46,6 +47,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 pub(super) struct CGContextHostObject {
     pub(super) subclass: CGContextSubclass,
     pub(super) rgb_fill_color: (CGFloat, CGFloat, CGFloat, CGFloat),
+    pub(super) rgb_stroke_color: (CGFloat, CGFloat, CGFloat, CGFloat),
     /// Current transform.
     pub(super) transform: CGAffineTransform,
     // TODO: keep more states saved once they are implemented
@@ -91,6 +93,67 @@ pub fn CGContextSetRGBFillColor(
         .rgb_fill_color = color;
 }
 
+pub fn CGContextSetRGBStrokeColor(
+    env: &mut Environment,
+    context: CGContextRef,
+    red: CGFloat,
+    green: CGFloat,
+    blue: CGFloat,
+    alpha: CGFloat,
+) {
+    let color = (red, green, blue, alpha);
+    env.objc
+        .borrow_mut::<CGContextHostObject>(context)
+        .rgb_stroke_color = color;
+}
+
+pub fn CGContextSetLineJoin(
+    env: &mut Environment,
+    context: CGContextRef,
+    join: i32,
+) {
+    // TODO: implementation
+}
+
+pub fn CGContextSetLineCap(
+    env: &mut Environment,
+    context: CGContextRef,
+    cap: i32,
+) {
+    // TODO: implementation
+}
+
+pub fn CGContextSetBlendMode(
+    env: &mut Environment,
+    context: CGContextRef,
+    mode: i32,
+) {
+    // TODO: implementation
+}
+
+pub fn CGContextSetLineWidth(
+    env: &mut Environment,
+    context: CGContextRef,
+    width: CGFloat,
+) {
+    // TODO: implementation
+}
+
+pub fn CGContextAddPath(
+    env: &mut Environment,
+    context: CGContextRef,
+    path: CGPathRef,
+) {
+    // TODO: implementation
+}
+
+pub fn CGContextStrokePath(
+    env: &mut Environment,
+    context: CGContextRef,
+) {
+    // TODO: implementation
+}
+
 fn CGContextSetGrayFillColor(
     env: &mut Environment,
     context: CGContextRef,
@@ -101,6 +164,11 @@ fn CGContextSetGrayFillColor(
     env.objc
         .borrow_mut::<CGContextHostObject>(context)
         .rgb_fill_color = color;
+}
+
+pub fn CGContextFillEllipseInRect(env: &mut Environment, context: CGContextRef, rect: CGRect) {
+    // TODO: Draw ellipse, not rect
+    cg_bitmap_context::fill_rect(env, context, rect, /* clear: */ false);
 }
 
 pub fn CGContextFillRect(env: &mut Environment, context: CGContextRef, rect: CGRect) {
@@ -124,7 +192,7 @@ fn CGContextClipToRect(env: &mut Environment, context: CGContextRef, rect: CGRec
         // All good, clipping is not needed!
         return;
     }
-    todo!();
+    // todo!();
 }
 
 pub fn CGContextConcatCTM(
@@ -203,7 +271,15 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGContextSetFillColorWithColor(_, _)),
     export_c_func!(CGContextSetRGBFillColor(_, _, _, _, _)),
     export_c_func!(CGContextSetGrayFillColor(_, _, _)),
+    export_c_func!(CGContextSetRGBStrokeColor(_, _, _, _, _)),
+    export_c_func!(CGContextSetLineJoin(_, _)),
+    export_c_func!(CGContextSetLineCap(_, _)),
+    export_c_func!(CGContextSetLineWidth(_, _)),
+    export_c_func!(CGContextSetBlendMode(_, _)),
+    export_c_func!(CGContextAddPath(_, _)),
+    export_c_func!(CGContextStrokePath(_)),
     export_c_func!(CGContextFillRect(_, _)),
+    export_c_func!(CGContextFillEllipseInRect(_, _)),
     export_c_func!(CGContextClearRect(_, _)),
     export_c_func!(CGContextClipToRect(_, _)),
     export_c_func!(CGContextConcatCTM(_, _)),

@@ -82,6 +82,8 @@ pub fn CGBitmapContextCreate(
         }),
         // TODO: is this the correct default?
         rgb_fill_color: (0.0, 0.0, 0.0, 0.0),
+        // TODO: is this the correct default?
+        rgb_stroke_color: (0.0, 0.0, 0.0, 0.0),
         transform: CGAffineTransformIdentity,
         state_stack: Vec::new(),
     };
