@@ -41,7 +41,20 @@ fn AudioServicesPlaySystemSound(_env: &mut Environment, in_system_sound_id: Syst
     // TODO: implement other system sounds
 }
 
+fn AudioServicesCreateSystemSoundID(_env: &mut Environment, in_file_url: MutVoidPtr, out_system_sound_id: MutPtr<u32>) -> OSStatus {
+    log!("TODO: create sound from `in_file_url`");
+    // TODO: load sound in `in_file_url`
+    _env.mem.write(out_system_sound_id, kSystemSoundID_Vibrate);
+    0
+}
+
+fn AudioServicesDisposeSystemSoundID(_env: &mut Environment, in_system_sound_id: SystemSoundID) {
+    log!("TODO: dispose sound");
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(AudioServicesGetProperty(_, _, _, _, _)),
     export_c_func!(AudioServicesPlaySystemSound(_)),
+    export_c_func!(AudioServicesCreateSystemSoundID(_, _)),
+    export_c_func!(AudioServicesDisposeSystemSoundID(_)),
 ];
