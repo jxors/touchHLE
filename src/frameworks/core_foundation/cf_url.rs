@@ -16,11 +16,11 @@ use crate::frameworks::core_foundation::cf_string::{
     CFStringRef,
 };
 use crate::frameworks::foundation::ns_string::{
-    get_static_str, to_rust_string, NSUTF8StringEncoding,
+    self, get_static_str, to_rust_string, NSUTF8StringEncoding,
 };
 use crate::frameworks::foundation::NSUInteger;
 use crate::mem::{ConstPtr, MutPtr, Ptr};
-use crate::objc::{id, msg, msg_class, release};
+use crate::objc::{autorelease, id, msg, msg_class, nil, release};
 use crate::Environment;
 
 pub type CFURLRef = super::CFTypeRef;
@@ -123,6 +123,50 @@ fn CFURLCreateWithFileSystemPath(
     msg![env; url initFileURLWithPath:file_path isDirectory:is_directory]
 }
 
+fn CFURLCreateStringByAddingPercentEscapes(
+    env: &mut Environment,
+    allocator: CFAllocatorRef,
+    original_string: CFStringRef,
+    characters_to_leave_unescaped: CFStringRef,
+    legal_url_characters_to_be_escaped: CFStringRef,
+    encoding: CFStringEncoding,
+) -> CFStringRef {
+    assert!(allocator == kCFAllocatorDefault || env.mem.read(allocator).is_system_default()); // unimplemented
+    let original_string = ns_string::to_rust_string(env, original_string);
+    let characters_to_leave_unescaped = if characters_to_leave_unescaped != nil {
+        ns_string::to_rust_string(env, characters_to_leave_unescaped)
+    } else {
+        "".into()
+    };
+    let legal_url_characters_to_be_escaped = if legal_url_characters_to_be_escaped != nil {
+        ns_string::to_rust_string(env, legal_url_characters_to_be_escaped)
+    } else {
+        "".into()
+    };
+
+    let mut encoded = String::new();
+    for byte in original_string.bytes() {
+        if (!matches!(byte,
+            b'A'..=b'Z' |
+            b'a'..=b'z' |
+            b'0'..=b'9' |
+            b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')'
+        ) || legal_url_characters_to_be_escaped
+            .as_bytes()
+            .contains(&byte))
+            && !characters_to_leave_unescaped.as_bytes().contains(&byte)
+        {
+            encoded.push('%');
+            encoded.push_str(&format!("{:02X}", byte));
+        } else {
+            encoded.push(byte as char);
+        }
+    }
+
+    // TODO: respect `encoding`
+    ns_string::from_rust_string(env, encoded)
+}
+
 pub fn CFURLCopyPathExtension(env: &mut Environment, url: CFURLRef) -> CFStringRef {
     let path = msg![env; url path];
     let ext = msg![env; path pathExtension];
@@ -191,5 +235,6 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CFURLCopyFileSystemPath(_, _)),
     export_c_func!(CFURLCreateCopyAppendingPathComponent(_, _, _, _)),
     export_c_func!(CFURLCreateCopyDeletingLastPathComponent(_, _)),
+    export_c_func!(CFURLCreateStringByAddingPercentEscapes(_, _, _, _, _)),
     export_c_func!(CFURLHasDirectoryPath(_)),
 ];
