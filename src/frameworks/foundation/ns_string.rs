@@ -471,8 +471,17 @@ pub const CLASSES: ClassExports = objc_classes! {
     msg![env; this rangeOfString:search_string options:0u32]
 }
 
+
 - (NSRange)rangeOfString:(id)search_string
                  options:(NSStringCompareOptions)options { // NSString *
+    let len: NSUInteger = msg![env; this length];
+    let range = NSRange { location: 0, length: len };
+    msg![env; this rangeOfString:search_string options:0u32 range:range]
+}
+
+- (NSRange)rangeOfString:(id)search_string
+                 options:(NSStringCompareOptions)options
+                 range:(NSRange) rangeOfReceiverToSearch { // NSString *
     log_dbg!(
         "[(NSString *){} rangeOfString:{} options:{}]",
         to_rust_string(env, this), to_rust_string(env, search_string), options
@@ -487,7 +496,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     match options {
         // 0 is for default options, which is NSLiteralSearch
         NSLiteralSearch | 0 => {
-            for i in 0..len {
+            for i in rangeOfReceiverToSearch.location..rangeOfReceiverToSearch.location + rangeOfReceiverToSearch.length {
                 if is_match_at_position(env, this, search_string, i, len, len_search, |a, b| a == b) {
                     return NSRange { location: i, length: len_search }
                 }
@@ -500,14 +509,14 @@ pub const CLASSES: ClassExports = objc_classes! {
                 };
                 a_c.to_lowercase().eq(b_c.to_lowercase())
             };
-            for i in 0..len {
+            for i in rangeOfReceiverToSearch.location..rangeOfReceiverToSearch.location + rangeOfReceiverToSearch.length {
                 if is_match_at_position(env, this, search_string, i, len, len_search, compare) {
                     return NSRange { location: i, length: len_search }
                 }
             }
         },
         NSBackwardsSearch => {
-            for i in (0..len).rev() {
+            for i in (rangeOfReceiverToSearch.location..rangeOfReceiverToSearch.location + rangeOfReceiverToSearch.length).rev() {
                 if is_match_at_position(env, this, search_string, i, len, len_search, |a, b| a == b) {
                     return NSRange { location: i, length: len_search }
                 }
@@ -1089,6 +1098,33 @@ pub const CLASSES: ClassExports = objc_classes! {
     // TODO: avoid copy
     let text = to_rust_string(env, this);
     ui_font::size_with_font(env, font, &text, Some((size, line_break_mode)))
+}
+
+- (CGSize)drawAtPoint:(CGPoint)point {
+    // TODO: how should a font be picked?
+    // // TODO: avoid copy
+    // let text = to_rust_string(env, this);
+    // let font = msg![env; UIFont systemFontOfSize: 10.0];
+    // ui_font::draw_at_point(env, font, &text, point, None)
+    CGSize {
+        width: 1.0,
+        height: 1.0,
+    }
+}
+
+
+- (CGSize)drawAtPoint:(CGPoint)point 
+         blendMode:(NSInteger) blendMode
+         alpha:(CGFloat) alpha {
+    // TODO: how should a font be picked?
+    // // TODO: avoid copy
+    // let text = to_rust_string(env, this);
+    // let font = msg![env; UIFont systemFontOfSize: 10.0];
+    // ui_font::draw_at_point(env, font, &text, point, None)
+    CGSize {
+        width: 1.0,
+        height: 1.0,
+    }
 }
 
 - (CGSize)drawAtPoint:(CGPoint)point
