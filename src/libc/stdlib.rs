@@ -185,6 +185,10 @@ fn prng(state: u32) -> u32 {
 
 const RAND_MAX: i32 = i32::MAX;
 
+fn sranddev(env: &mut Environment) {
+    // TODO: use randomness
+    env.libc_state.stdlib.rand = 4;
+}
 fn srand(env: &mut Environment, seed: u32) {
     env.libc_state.stdlib.rand = seed;
 }
@@ -518,6 +522,7 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(atof(_)),
     export_c_func!(strtod(_, _)),
     export_c_func!(srand(_)),
+    export_c_func!(sranddev()),
     export_c_func!(rand()),
     export_c_func!(srandom(_)),
     export_c_func!(random()),
