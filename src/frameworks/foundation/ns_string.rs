@@ -1184,6 +1184,20 @@ pub const CLASSES: ClassExports = objc_classes! {
     st[..cutoff].parse().unwrap_or(0)
 }
 
+- (i64)longLongValue {
+    let st = to_rust_string(env, this);
+    let st = st.trim_start();
+    let mut cutoff = st.len();
+    for (i, c) in st.char_indices() {
+        if !c.is_ascii_digit() && c != '+' && c != '-' {
+            cutoff = i;
+            break;
+        }
+    }
+    // TODO: handle over/underflow properly
+    st[..cutoff].parse().unwrap_or(0)
+}
+
 - (id)lowercaseString {
     // TODO: check if rust methods are consistent with ObjC one
     let str = to_rust_string(env, this).to_lowercase();
