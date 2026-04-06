@@ -18,6 +18,7 @@ use super::cg_image::{
 };
 use super::{CGFloat, CGPoint, CGRect};
 use crate::dyld::{export_c_func, FunctionExports};
+use crate::frameworks::core_graphics::CGSize;
 use crate::image::{gamma_decode, gamma_encode, Image};
 use crate::mem::{GuestUSize, Mem, MutVoidPtr};
 use crate::objc::ObjC;
@@ -84,8 +85,10 @@ pub fn CGBitmapContextCreate(
         rgb_fill_color: (0.0, 0.0, 0.0, 0.0),
         // TODO: is this the correct default?
         rgb_stroke_color: (0.0, 0.0, 0.0, 0.0),
+        line_width: 1.0,
         transform: CGAffineTransformIdentity,
         state_stack: Vec::new(),
+        current_path: Vec::new(),
     };
     let isa = env
         .objc
@@ -363,8 +366,10 @@ fn put_pixel(
 pub struct CGBitmapContextDrawer<'a> {
     bitmap_info: CGBitmapContextData,
     rgb_fill_color: (CGFloat, CGFloat, CGFloat, CGFloat),
+    rgb_stroke_color: (CGFloat, CGFloat, CGFloat, CGFloat),
     transform: CGAffineTransform,
     pixels: &'a mut [u8],
+    line_width: f32,
 }
 impl CGBitmapContextDrawer<'_> {
     pub fn new<'a>(
@@ -375,7 +380,9 @@ impl CGBitmapContextDrawer<'_> {
         let &CGContextHostObject {
             subclass: CGContextSubclass::CGBitmapContext(bitmap_info),
             rgb_fill_color,
+            rgb_stroke_color,
             transform,
+            line_width,
             ..
         } = objc.borrow(context);
 
@@ -384,6 +391,8 @@ impl CGBitmapContextDrawer<'_> {
         CGBitmapContextDrawer {
             bitmap_info,
             rgb_fill_color,
+            rgb_stroke_color,
+            line_width,
             transform,
             pixels,
         }
@@ -412,6 +421,23 @@ impl CGBitmapContextDrawer<'_> {
             self.rgb_fill_color.3, // alpha is always linear
         )
     }
+
+    pub fn rgb_stroke_color(&self) -> (CGFloat, CGFloat, CGFloat, CGFloat) {
+        let multiply_by = match self.bitmap_info.alpha_info {
+            kCGImageAlphaPremultipliedLast | kCGImageAlphaPremultipliedFirst => {
+                self.rgb_stroke_color.3
+            }
+            _ => 1.0,
+        };
+        // Multiplying before decoding matches the Simulator's output.
+        (
+            gamma_decode(self.rgb_stroke_color.0 * multiply_by),
+            gamma_decode(self.rgb_stroke_color.1 * multiply_by),
+            gamma_decode(self.rgb_stroke_color.2 * multiply_by),
+            self.rgb_stroke_color.3, // alpha is always linear
+        )
+    }
+
     /// Set the pixel at `coords` to `color`. `color` must be linear RGB, not
     /// sRGB! Note that `coords` are absolute: you must do transformation
     /// yourself.
@@ -491,6 +517,8 @@ fn test_iter_transformed_pixels() {
                 alpha_info: 0,
             },
             rgb_fill_color: (0.0, 0.0, 0.0, 0.0),
+            rgb_stroke_color: (0.0, 0.0, 0.0, 0.0),
+            line_width: 1.0,
             transform,
             pixels: &mut [],
         }
@@ -575,6 +603,66 @@ pub(super) fn fill_rect(env: &mut Environment, context: CGContextRef, rect: CGRe
     // TODO: correct anti-aliasing
     for ((x, y), _) in drawer.iter_transformed_pixels(rect) {
         drawer.put_pixel((x, y), color, /* blend: */ !clear)
+    }
+}
+
+/// Draw a line
+pub(super) fn stroke_line(env: &mut Environment, context: CGContextRef, a: CGPoint, b: CGPoint) {
+    let mut drawer = CGBitmapContextDrawer::new(&env.objc, &mut env.mem, context);
+    let color = drawer.rgb_stroke_color();
+    let (start, end) = if a.y < b.y {
+        (a, b)
+    } else {
+        (b, a)
+    };
+
+    // TODO: handle stroke width
+    // TODO: correct anti-aliasing
+    // TODO: I have no idea what I'm doing; should just use a proper line-drawing algorithm
+    if end.y - start.y > end.x - start.x {
+        let mut y = start.y.min(end.y - 0.05);
+        while y <= end.y {
+            let ratio = (y - start.y) / (end.y - start.y);
+            let x = ratio * (end.x - start.x) + start.x;
+            let rect = CGRect {
+                origin: CGPoint {
+                    x: x - drawer.line_width / 2.,
+                    y: y - drawer.line_width / 2.,
+                },
+                size: CGSize {
+                    width: drawer.line_width,
+                    height: drawer.line_width,
+                },
+            };
+
+            for ((x, y), _) in drawer.iter_transformed_pixels(rect) {
+                drawer.put_pixel((x, y), color, /* blend: */ true)
+            }
+
+            y += 0.1;
+        }
+    } else {
+        let mut x = start.x.min(end.x - 0.05);
+        while x <= end.x {
+            let ratio = (x - start.x) / (end.x - start.x);
+            let y = ratio * (end.y - start.y) + start.y;
+            let rect = CGRect {
+                origin: CGPoint {
+                    x: x - drawer.line_width / 2.,
+                    y: y - drawer.line_width / 2.,
+                },
+                size: CGSize {
+                    width: drawer.line_width,
+                    height: drawer.line_width,
+                },
+            };
+
+            for ((x, y), _) in drawer.iter_transformed_pixels(rect) {
+                drawer.put_pixel((x, y), color, /* blend: */ true)
+            }
+
+            x += 0.1;
+        }
     }
 }
 

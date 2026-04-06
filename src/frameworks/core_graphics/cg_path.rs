@@ -5,11 +5,15 @@
  */
 //! `CGPath.h`
 
+use std::ops::Add;
+
 use crate::dyld::{export_c_func, ConstantExports, FunctionExports, HostConstant};
 use crate::frameworks::core_foundation::cf_string::CFStringRef;
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
+use crate::frameworks::core_graphics::CGPoint;
 use crate::frameworks::core_graphics::cg_affine_transform::CGAffineTransform;
 use crate::frameworks::foundation::ns_string;
+use crate::mem::{ConstPtr, GuestUSize};
 use crate::objc::{msg, objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
@@ -25,8 +29,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 };
 
+#[derive(Clone)]
 pub(super) struct CGPathHostObject {
-
+    pub(super) points: Vec<CGPoint>,
 }
 impl HostObject for CGPathHostObject {}
 
@@ -39,13 +44,21 @@ pub fn CGPathCreateMutable(env: &mut Environment) -> CGPathRef {
     env.objc.alloc_object(
         isa,
         Box::new(CGPathHostObject {
-            
+            points: Vec::new(),
         }),
         &mut env.mem,
     )
 }
 
-pub fn CGPathAddLines(env: &mut Environment, m: CFTypeRef, points: CFTypeRef, count: i32) {
+pub fn CGPathAddLines(env: &mut Environment, path: CGPathRef, m: ConstPtr<CGAffineTransform>, points: ConstPtr<CGPoint>, count: GuestUSize) {
+    // TODO: transforms
+    assert!(m.is_null());
+
+    let path = env.objc.borrow_mut::<CGPathHostObject>(path);
+    for index in 0..count {
+        let point = env.mem.read(points.add(index));
+        path.points.push(point);
+    }
 }
 
 pub fn CGPathRelease(env: &mut Environment, path: CGPathRef) {
@@ -56,6 +69,6 @@ pub fn CGPathRelease(env: &mut Environment, path: CGPathRef) {
 
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CGPathCreateMutable()),
-    export_c_func!(CGPathAddLines(_, _, _)),
+    export_c_func!(CGPathAddLines(_, _, _, _)),
     export_c_func!(CGPathRelease(_)),
 ];

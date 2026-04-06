@@ -10,12 +10,13 @@ use super::cg_image::CGImageRef;
 use super::{cg_bitmap_context, cg_color, CGFloat, CGRect};
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::core_foundation::{CFRelease, CFRetain, CFTypeRef};
+use crate::frameworks::core_graphics::CGPoint;
 use crate::frameworks::core_graphics::cg_bitmap_context::{
     CGBitmapContextGetHeight, CGBitmapContextGetWidth,
 };
 use crate::frameworks::core_graphics::cg_color::CGColorRef;
 use crate::frameworks::core_graphics::cg_geometry::CGPointZero;
-use crate::frameworks::core_graphics::cg_path::CGPathRef;
+use crate::frameworks::core_graphics::cg_path::{CGPathHostObject, CGPathRef};
 use crate::objc::{objc_classes, ClassExports, HostObject};
 use crate::Environment;
 
@@ -52,6 +53,8 @@ pub(super) struct CGContextHostObject {
     pub(super) transform: CGAffineTransform,
     // TODO: keep more states saved once they are implemented
     pub(super) state_stack: Vec<((CGFloat, CGFloat, CGFloat, CGFloat), CGAffineTransform)>,
+    pub(super) current_path: Vec<CGPoint>,
+    pub(super) line_width: f32,
 }
 impl HostObject for CGContextHostObject {}
 
@@ -136,7 +139,9 @@ pub fn CGContextSetLineWidth(
     context: CGContextRef,
     width: CGFloat,
 ) {
-    // TODO: implementation
+    env.objc
+        .borrow_mut::<CGContextHostObject>(context)
+        .line_width = width;
 }
 
 pub fn CGContextAddPath(
@@ -144,7 +149,12 @@ pub fn CGContextAddPath(
     context: CGContextRef,
     path: CGPathRef,
 ) {
-    // TODO: implementation
+    // TODO: apply current transformation matrix
+    let path = env.objc.borrow::<CGPathHostObject>(path).clone();
+    env.objc
+        .borrow_mut::<CGContextHostObject>(context)
+        .current_path
+        .extend_from_slice(&path.points);
 }
 
 pub fn CGContextStrokePath(
@@ -152,6 +162,16 @@ pub fn CGContextStrokePath(
     context: CGContextRef,
 ) {
     // TODO: implementation
+    let points = std::mem::take(&mut env.objc
+        .borrow_mut::<CGContextHostObject>(context)
+        .current_path
+    );
+
+    for window in points.windows(2) {
+        let start = window[0];
+        let end = window[1];
+        cg_bitmap_context::stroke_line(env, context, start, end);
+    }
 }
 
 fn CGContextSetGrayFillColor(
