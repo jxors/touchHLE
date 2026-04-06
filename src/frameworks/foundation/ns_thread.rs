@@ -118,6 +118,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.current_thread == 0
 }
 
++ (id)mainThread {
+    assert_eq!(env.current_thread, 0);
+    msg![ env; this currentThread ]
+}
+
 - (id)initWithTarget:(id)target
             selector:(SEL)selector
               object:(id)object {
